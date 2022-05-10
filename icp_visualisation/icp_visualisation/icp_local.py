@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 import numpy as np
-import icp_py_localiser.ros2_numpy.point_cloud2 as pcl2 #icp_localiser.ros2_numpy
+import icp_visualisation.ros2_numpy.point_cloud2 as pcl2 #icp_localiser.ros2_numpy
 import pcl
 import collections, operator
 #import sensor_msgs_py.point_cloud2 as pcl2
@@ -102,33 +102,11 @@ class IcpLocal(Node):
         ## Find initial position?
         pass
 
-    # BT = collections.namedtuple("BT", ["value", "left", "right"])
-    # BT.__doc__ = ""
-    # def kdtree(points):
-    #     k = len(points[0])
-    #     def build(*, points, depth):
-    #         if len(points)==0:
-    #             return None
-    #         points.sort(key=operator.itemgetter(depth % k))
-    #         middle = len(points)//2
-    #         return BT(
-    #             value = points[middle],
-    #             left = build(
-    #                 points=points[:middle],
-    #                 depth=depth+1,
-    #             ),
-    #             right = build(
-    #                 points=points[middle+1:],
-    #                 depth=depth+1,
-    #             ),
-    #         )
-    #     return build(points=list(points), depth=0)
-
 
 def main(args=None):
     rclpy.init(args=args)
     IcpNode = IcpLocal()
-    print('Hi from icp_py_localiser.')
+    print('Hi from icp_visualisation.')
     # lidar is sensor_msgs/msg/PointCloud2
     try:
         rclpy.spin(IcpNode)
