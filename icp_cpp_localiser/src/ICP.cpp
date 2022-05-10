@@ -30,7 +30,7 @@
 
 #include <pcl/registration/icp.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <pcl_ros/transforms.hpp>
+/*#include <pcl_ros/transforms.hpp>*/
 
 
 using std::placeholders::_1;
@@ -265,7 +265,6 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl::PCLPointCloud2 pcl_pc2;
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, *prev_cloud_ptr);
-        
         filterCloud(prev_cloud_ptr, filtered_cloud_ptr);
         
         _prev_cloud = *filtered_cloud_ptr;

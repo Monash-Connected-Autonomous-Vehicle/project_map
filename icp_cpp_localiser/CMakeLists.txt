@@ -13,7 +13,7 @@ endif()
 
 # add_executable(icp_localiser src/icp_cpp_node.cpp)
 # target_link_libraries(icp_localiser ${PCL_Libraries})
-
+add_executable(icp_localiser_node src/ICP_node.cpp src/ICP.cpp) # Add executable needs a main function - just add these two files into executble
 
 # ament_target_dependencies(icp_localiser rclcpp std_msgs PCL)
 # # uncomment the following section in order to fill in
@@ -34,19 +34,20 @@ find_package(tf2 REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(PCL REQUIRED)
+find_package(PCL 1.8 REQUIRED)
 #find_package(perception_pcl REQUIRED)
 find_package(pcl_conversions REQUIRED)
-find_package(pcl_ros REQUIRED)
+#find_package(pcl_ros REQUIRED)
 
-include_directories(
-  include
-  ${PCL_INCLUDE_DIRS})
+set(PCL_INCLUDE_DIRS /usr/local/include/pcl-1.8)
+include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
+target_include_directories( icp_localiser_node PUBLIC ${PCL_INCLUDE_DIRS})
+target_link_libraries( icp_localiser_node ${PCL_LIBRARIES})
 
 
-add_executable(icp_localiser_node src/ICP_node.cpp src/ICP.cpp) # Add executable needs a main function - just add these two files into executble
+
 ament_target_dependencies(icp_localiser_node
   "rclcpp"
   "tf2"
@@ -54,7 +55,7 @@ ament_target_dependencies(icp_localiser_node
   "geometry_msgs"
   "sensor_msgs"
   "PCL"
-  "pcl_ros"
+  #"pcl_ros"
   "pcl_conversions"
   )
 
