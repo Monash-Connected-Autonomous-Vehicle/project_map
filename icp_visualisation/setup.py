@@ -1,11 +1,11 @@
 from setuptools import setup
 
-package_name = 'icp_py_localiser'
+package_name = 'icp_visualisation'
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name,'icp_py_localiser/ros2_numpy'],
+    packages=[package_name,'icp_visualisation/ros2_numpy'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'icp_local = icp_py_localiser.pose_path:main'
+            'icp_local = icp_visualisation.pose_path:main'
         ],
     },
 )
