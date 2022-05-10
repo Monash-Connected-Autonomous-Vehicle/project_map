@@ -73,6 +73,7 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
+ament_package()
 ###################################
 ## catkin specific configuration ##
 ###################################
