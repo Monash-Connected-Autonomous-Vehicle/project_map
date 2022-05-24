@@ -32,6 +32,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 /*#include <pcl_ros/transforms.hpp>*/
 
+#include <boost/filesystem.hpp>
 
 using std::placeholders::_1;
 
@@ -120,6 +121,22 @@ ICP3D::ICP3D()
     is_initial = true;
     is_imu_start = true;
 
+
+    boost::filesystem::path full_path(boost::filesystem::current_path());
+    std::cout << "Current path is : " << full_path << std::endl;
+
+    //load map - only working with ROS run, as cwd if different for roslaunch
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    if (pcl::io::loadPCDFile<pcl::PointXYZ> ("map.pcd", *cloud) == -1) //* load the file
+    {
+      RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
+    }
+    else {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        filterCloud(cloud, filtered_cloud_ptr);
+        _prev_cloud = *filtered_cloud_ptr;
+        RCLCPP_INFO(this->get_logger(),"Cloud Loaded \n"); 
+    }
 }
 
 /* @brief Cropping the cloud using Box filter */
