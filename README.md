@@ -75,7 +75,7 @@ Terminal 5 (Launch ICP CPP Matching):
 
 Terminal 6 (Launch ICP Matching Visualisation):
 - `cd ~/mcav_ws && source install/setup.bash`
-- `ros2 run icp_py_localiser icp_local`
+- `ros2 run icp_visualisation icp_local`
 
 
 ### StreetDrone example
