@@ -47,6 +47,10 @@ target_include_directories( icp_localiser_node PUBLIC ${PCL_INCLUDE_DIRS})
 target_link_libraries( icp_localiser_node ${PCL_LIBRARIES})
 
 
+# TEST - For finding PCD File
+find_package(Boost
+  )                      # e.g. "date_time" for "libboost_date_time"
+################################
 
 ament_target_dependencies(icp_localiser_node
   "rclcpp"
