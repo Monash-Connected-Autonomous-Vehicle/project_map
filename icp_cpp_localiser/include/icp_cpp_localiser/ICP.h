@@ -34,6 +34,7 @@ class ICP3D : public rclcpp::Node
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pc_sub_;
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub;
+        //rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub;
   
         pcl::PointCloud<pcl::PointXYZ> _prev_cloud; //point cloud at the previous time instance
         Eigen::Matrix4f prev_transformation; //cumulative transformation until the previous time instance
