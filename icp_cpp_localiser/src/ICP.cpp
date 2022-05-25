@@ -30,6 +30,7 @@
 
 #include <pcl/registration/icp.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/voxel_grid.h>
 /*#include <pcl_ros/transforms.hpp>*/
 
 #include <boost/filesystem.hpp>
@@ -58,8 +59,9 @@ ICP3D::ICP3D()
     this->declare_parameter("max_iters",75.0); ///
     this->declare_parameter("euclidean_fitness_epsilon",0.1);
     this->declare_parameter("max_correspondence_distance",1.0);
-    this->declare_parameter("point_cloud_topic","velodyne_points");
-    this->declare_parameter("imu_topic","imu/data");
+    // Had to change while using ros2 run instead of Launch ///////////////
+    this->declare_parameter("point_cloud_topic","/carla/ego_vehicle/lidar");
+    this->declare_parameter("imu_topic","/carla/ego_vehicle/imu");
     this->declare_parameter("pose_topic","icp_pose");
 
     /* Loading parameters */
@@ -111,6 +113,7 @@ ICP3D::ICP3D()
     pc_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(_point_cloud_topic, 1, std::bind(&ICP3D::cloudCallback, this, _1));
     imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(_imu_topic, 1, std::bind(&ICP3D::imuCallback, this, _1));
     pose_pub = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(_pose_topic,1);
+    //map_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("the_map",1);
 
     //initialising values
     _prev_acc = 0.0;
@@ -121,22 +124,8 @@ ICP3D::ICP3D()
     is_initial = true;
     is_imu_start = true;
 
-
     boost::filesystem::path full_path(boost::filesystem::current_path());
     std::cout << "Current path is : " << full_path << std::endl;
-
-    //load map - only working with ROS run, as cwd if different for roslaunch
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
-    if (pcl::io::loadPCDFile<pcl::PointXYZ> ("map.pcd", *cloud) == -1) //* load the file
-    {
-      RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
-    }
-    else {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        filterCloud(cloud, filtered_cloud_ptr);
-        _prev_cloud = *filtered_cloud_ptr;
-        RCLCPP_INFO(this->get_logger(),"Cloud Loaded \n"); 
-    }
 }
 
 /* @brief Cropping the cloud using Box filter */
@@ -146,8 +135,9 @@ void ICP3D::cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pc
     boxFilter.setMin(Eigen::Vector4f(_minX, _minY, _minZ, 1.0));
     boxFilter.setMax(Eigen::Vector4f(_maxX, _maxY, _maxZ, 1.0));
     boxFilter.setInputCloud(in_cloud_ptr);
-    boxFilter.filter(*out_cloud_ptr);
-
+    // This filter is not working ////// Please fix
+    boxFilter.filter(*out_cloud_ptr); 
+    
     //cout<<"Crop Input: "<<in_cloud_ptr->size()<<" pts, Crop output: "<<out_cloud_ptr->size()<<" pts"<<endl;
 
     return;
@@ -228,10 +218,16 @@ void ICP3D::filterCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, 
     pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr no_noise_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    
     //pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
-    cropCloud(in_cloud_ptr, cropped_cloud_ptr);
-    removeGround(cropped_cloud_ptr, no_ground_cloud_ptr, only_ground_cloud_ptr);
+    // Error coming from filter in cropCloud for incoming scans ////////
+    // cropCloud(in_cloud_ptr, cropped_cloud_ptr);
+
+    // Errors for map coming from
+    removeGround(in_cloud_ptr, no_ground_cloud_ptr, only_ground_cloud_ptr);
+    // RCLCPP_INFO(this->get_logger(),to_string(no_ground_cloud_ptr->size())); 
+    // RCLCPP_INFO(this->get_logger(),"No Ground Loaded \n"); 
     removeNoise(no_ground_cloud_ptr, no_noise_cloud_ptr);
     //removeNoise(no_ground_cloud_ptr, out_cloud_ptr);
     downsampleCloud(no_noise_cloud_ptr, out_cloud_ptr);
@@ -274,17 +270,53 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     
     if(is_initial)
     {
-	    pcl::PointCloud<pcl::PointXYZ>::Ptr prev_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+            //load map - only working with ROS run, as cwd if different for roslaunch
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        if (pcl::io::loadPCDFile<pcl::PointXYZ> ("map.pcd", *cloud) == -1) //* load the file
+        {
+            RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
+        }
+        else {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+            //filterCloud(cloud, filtered_cloud_ptr);
+            // Errors for map coming from remove ground - get rid of this functionality - but try the rest of 'filterCloud'
+            //RCLCPP_INFO(this->get_logger(),to_string(cloud->size())); 
+            pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::PointCloud<pcl::PointXYZ>::Ptr no_noise_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+            
+            // //this->cropCloud(cloud, cropped_cloud_ptr);
+            // //this->removeNoise(cropped_cloud_ptr, no_noise_cloud_ptr);
+            // this->downsampleCloud(cloud, out_cloud_ptr);
+            // _prev_cloud = *out_cloud_ptr;
+            // RCLCPP_INFO(this->get_logger(),to_string(_prev_cloud.size())); 
+            // // Doesn't seem to be downsampling
+            
 
-        //pcl::fromPCLPointCloud2(*msg, *prev_cloud_ptr);
-        //pcl_conversions::fromROSMsg(*msg, *prev_cloud_ptr);
-        pcl::PCLPointCloud2 pcl_pc2;
-        pcl_conversions::toPCL(*msg, pcl_pc2);
-        pcl::fromPCLPointCloud2(pcl_pc2, *prev_cloud_ptr);
-        filterCloud(prev_cloud_ptr, filtered_cloud_ptr);
+            // OR COULD TRY JUST DOWNSAMPLING
+            pcl::PCLPointCloud2::Ptr pcl_cloud2 (new pcl::PCLPointCloud2());
+            pcl::PCLPointCloud2::Ptr pcl_cloud2_filtered (new pcl::PCLPointCloud2());
+            pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+
+            pcl::VoxelGrid<pcl::PCLPointCloud2> downsample;
+            pcl::toPCLPointCloud2(*cloud,*pcl_cloud2);
+            downsample.setInputCloud(pcl_cloud2);
+            downsample.setLeafSize(0.6f,0.6f,0.6f);
+            downsample.filter(*pcl_cloud2_filtered);
+            pcl::fromPCLPointCloud2(*pcl_cloud2_filtered,*pcl_cloud_filtered);
+            _prev_cloud = *pcl_cloud_filtered;
+            //RCLCPP_INFO(this->get_logger(),to_string(pcl_cloud_filtered->size())); 
+            //RCLCPP_INFO(this->get_logger(),"Cloud Loaded \n"); 
+        }
+	    pcl::PointCloud<pcl::PointXYZ>::Ptr prev_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        // pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        // pcl::PCLPointCloud2 pcl_pc2;
+        // pcl_conversions::toPCL(*msg, pcl_pc2);
+        // pcl::fromPCLPointCloud2(pcl_pc2, *prev_cloud_ptr);
+        // filterCloud(prev_cloud_ptr, filtered_cloud_ptr);
         
-        _prev_cloud = *filtered_cloud_ptr;
+        // _prev_cloud = *filtered_cloud_ptr;
         _prev_time_stamp = msg->header.stamp.sec;
 
         //initialising the previous transformation
@@ -292,13 +324,11 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
         is_initial = false;
     }
-    else
-    {
-	    pcl::PointCloud<pcl::PointXYZ>::Ptr prev_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>(_prev_cloud));
+    else {
         pcl::PointCloud<pcl::PointXYZ>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-
+        pcl::PointCloud<pcl::PointXYZ>::Ptr prev_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>(_prev_cloud));
         chrono::time_point<chrono::system_clock> start, end;
 
         start = chrono::system_clock::now(); 
@@ -306,9 +336,11 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl::PCLPointCloud2 pcl_pc2;
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, *current_cloud_ptr);
-        
+        RCLCPP_INFO(this->get_logger(),to_string(current_cloud_ptr->size()));
         filterCloud(current_cloud_ptr, filtered_cloud_ptr);
-        
+        RCLCPP_INFO(this->get_logger(),to_string(filtered_cloud_ptr->size())); 
+        RCLCPP_INFO(this->get_logger(),to_string(prev_cloud_ptr->size())); 
+        RCLCPP_INFO(this->get_logger(),"Cloud Callback \n"); 
         //cout<<"Filtered cloud has "<<filtered_cloud_ptr->size()<<"points"<<endl;
         //cout<<"Current cloud has "<<current_cloud_ptr->size()<<"points"<<endl;
 
@@ -353,8 +385,8 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         
         trans << curr_transformation(0,3), curr_transformation(1,3), curr_transformation(2,3);
         mat << curr_transformation(0,0), curr_transformation(0,1), curr_transformation(0,2),
-               curr_transformation(1,0), curr_transformation(1,1), curr_transformation(1,2),
-               curr_transformation(2,0), curr_transformation(2,1), curr_transformation(2,2);
+                curr_transformation(1,0), curr_transformation(1,1), curr_transformation(1,2),
+                curr_transformation(2,0), curr_transformation(2,1), curr_transformation(2,2);
 
         Eigen::Quaternionf quat(mat); //rotation matrix stored as a quaternion
 
@@ -375,10 +407,14 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
         pose_pub->publish(curr_pose); //publishing the current pose
 
-        _prev_cloud = *filtered_cloud_ptr;
+
+        //the_map_cloud = _prev_cloud.
+        //map_pub->publish(_prev_cloud);
+
+        //Stop updating - keep it as map
+        //_prev_cloud = *filtered_cloud_ptr;
         prev_transformation = curr_transformation;
         _prev_time_stamp = msg->header.stamp.sec;
     }
-
     return;
 }
