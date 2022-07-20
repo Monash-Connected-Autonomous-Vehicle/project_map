@@ -2,6 +2,7 @@ icp_localiser_node:
   ros__parameters:
     point_cloud_topic: "/carla/ego_vehicle/lidar" #point cloud ros topic to subscribe to
     imu_topic: "/carla/ego_vehicle/imu" #imu ros topic to subscribe to
+    imu_topic: "/carla/ego_vehicle/gnss" #imu ros topic to subscribe to
     pose_topic: "/my_icp_pose" #pose ros topic to which to publish
 
     leaf_size: 0.1 #leaf size for voxel grid

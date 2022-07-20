@@ -10,10 +10,10 @@
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 
 #include <string>
-
 #include <pcl/common/common.h>
 #include <pcl/point_types.h>
 #include <pcl/PCLPointCloud2.h>
@@ -27,6 +27,7 @@ class ICP3D : public rclcpp::Node
         //using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
         void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg); //point cloud callback
         void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg); //imu data callback
+        void gnssCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg); //imu data callback
         
         void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); //crops cloud using box filter
         void removeNoise(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); //removes noise using Statistical outlier removal
@@ -37,6 +38,7 @@ class ICP3D : public rclcpp::Node
 
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pc_sub_;
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
+        rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gnss_sub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub;
         rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub;
   
@@ -50,6 +52,7 @@ class ICP3D : public rclcpp::Node
         /*---------sub-pub parameters----------*/
         std::string _point_cloud_topic; //point cloud ros topic to subscribe to
         std::string _imu_topic; //imu ros topic to subscribe to
+        std::string _gnss_topic; //imu ros topic to subscribe to
         std::string _pose_topic; //pose ros topic to which to publish
         
         /*----------ICP parameters------------*/
