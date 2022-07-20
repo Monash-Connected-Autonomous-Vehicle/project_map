@@ -320,10 +320,10 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         icp.setEuclideanFitnessEpsilon(_euclidean_fitness_epsilon);
 
         // Match to the previous Cloud
-        //icp.setInputSource(_prev_cloud_ptr);
+        icp.setInputSource(_prev_cloud_ptr);
 
         // Match to the Map Cloud
-        icp.setInputTarget(map_cloud_ptr);
+        //icp.setInputTarget(map_cloud_ptr);
 
         icp.setInputSource(filtered_cloud_ptr);
 
