@@ -63,6 +63,7 @@ ICP3D::ICP3D()
     this->declare_parameter("point_cloud_topic","/carla/ego_vehicle/lidar");
     this->declare_parameter("imu_topic","/carla/ego_vehicle/imu");
     this->declare_parameter("pose_topic","icp_pose");
+    this->declare_parameter("map_path","/icp_cpp_localiser/map.pcd");
 
     /* Loading parameters */
     this->get_parameter("leaf_size", _leaf_size);
@@ -99,21 +100,20 @@ ICP3D::ICP3D()
  
     this->get_parameter("point_cloud_topic", _point_cloud_topic);
     RCLCPP_INFO(this->get_logger(),"point_cloud_topic: %s", _point_cloud_topic.c_str());  
-    // private_nh.param<std::string>("point_cloud_topic", _point_cloud_topic, "velodyne_points");
-    // RCLCPP_INFO(node->get.logger(),"point_cloud_topic: %s", _point_cloud_topic.c_str());
     this->get_parameter("imu_topic", _imu_topic);
     RCLCPP_INFO(this->get_logger(),"imu_topic: %s", _imu_topic.c_str()); 
-    // private_nh.param<std::string>("imu_topic", _imu_topic, "imu/data");
-    // RCLCPP_INFO(node->get.logger(),"imu_topic: %s", _imu_topic.c_str());
     this->get_parameter("pose_topic", _pose_topic);
     RCLCPP_INFO(this->get_logger(),"pose_topic: %s", _pose_topic.c_str()); 
-    // private_nh.param<std::string>("pose_topic", _pose_topic, "icp_pose");
-    // RCLCPP_INFO(node->get.logger(),"pose_topic: %s", _pose_topic.c_str());
 
+    this->get_parameter("map_path", _map_path);
+    RCLCPP_INFO(this->get_logger(),"map_path: %s", _map_path.c_str());
+
+    // Subscribers and Publishers
     pc_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(_point_cloud_topic, 1, std::bind(&ICP3D::cloudCallback, this, _1));
     imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(_imu_topic, 1, std::bind(&ICP3D::imuCallback, this, _1));
     pose_pub = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(_pose_topic,1);
-    //map_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("the_map",1);
+    map_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("the_map",rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+
 
     //initialising values
     _prev_acc = 0.0;
@@ -124,6 +124,7 @@ ICP3D::ICP3D()
     is_initial = true;
     is_imu_start = true;
 
+    // Check for path to find pcd map
     boost::filesystem::path full_path(boost::filesystem::current_path());
     std::cout << "Current path is : " << full_path << std::endl;
 }
@@ -266,56 +267,24 @@ void ICP3D::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 /* @brief Callback function for pointcloud, implements the ICP algo */
 void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-    //cout<<"-------Entered callback---------"<<endl;
-    
     if(is_initial)
     {
-            //load map - only working with ROS run, as cwd if different for roslaunch
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
-        if (pcl::io::loadPCDFile<pcl::PointXYZ> ("map.pcd", *cloud) == -1) //* load the file
+        pcl::PointCloud<pcl::PointXYZ>::Ptr incoming_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        if (pcl::io::loadPCDFile(_map_path, *incoming_cloud_ptr) == -1) //* load the file
         {
             RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
         }
         else {
-            pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-            //filterCloud(cloud, filtered_cloud_ptr);
-            // Errors for map coming from remove ground - get rid of this functionality - but try the rest of 'filterCloud'
-            //RCLCPP_INFO(this->get_logger(),to_string(cloud->size())); 
-            pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-            pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-            pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-            pcl::PointCloud<pcl::PointXYZ>::Ptr no_noise_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-            
-            // //this->cropCloud(cloud, cropped_cloud_ptr);
-            // //this->removeNoise(cropped_cloud_ptr, no_noise_cloud_ptr);
-            // this->downsampleCloud(cloud, out_cloud_ptr);
-            // _prev_cloud = *out_cloud_ptr;
-            // RCLCPP_INFO(this->get_logger(),to_string(_prev_cloud.size())); 
-            // // Doesn't seem to be downsampling
-            
-
-            // OR COULD TRY JUST DOWNSAMPLING
-            pcl::PCLPointCloud2::Ptr pcl_cloud2 (new pcl::PCLPointCloud2());
-            pcl::PCLPointCloud2::Ptr pcl_cloud2_filtered (new pcl::PCLPointCloud2());
-            pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
-
-            pcl::VoxelGrid<pcl::PCLPointCloud2> downsample;
-            pcl::toPCLPointCloud2(*cloud,*pcl_cloud2);
-            downsample.setInputCloud(pcl_cloud2);
-            downsample.setLeafSize(0.6f,0.6f,0.6f);
-            downsample.filter(*pcl_cloud2_filtered);
-            pcl::fromPCLPointCloud2(*pcl_cloud2_filtered,*pcl_cloud_filtered);
-            _prev_cloud = *pcl_cloud_filtered;
-            //RCLCPP_INFO(this->get_logger(),to_string(pcl_cloud_filtered->size())); 
-            //RCLCPP_INFO(this->get_logger(),"Cloud Loaded \n"); 
+            //filterCloud(incoming_cloud_ptr, filtered_map_ptr);
+            sensor_msgs::msg::PointCloud2::SharedPtr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
+            pcl::toROSMsg(*incoming_cloud_ptr, *map_msg_ptr);
+            map_msg_ptr->header.frame_id = "icp";
+            map_pub->publish(*map_msg_ptr);
+            //_prev_cloud = *cloud_ptr;
+            _map_cloud = *incoming_cloud_ptr;
         }
-	    pcl::PointCloud<pcl::PointXYZ>::Ptr prev_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
-        // pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        // pcl::PCLPointCloud2 pcl_pc2;
-        // pcl_conversions::toPCL(*msg, pcl_pc2);
-        // pcl::fromPCLPointCloud2(pcl_pc2, *prev_cloud_ptr);
-        // filterCloud(prev_cloud_ptr, filtered_cloud_ptr);
-        
+	    
         // _prev_cloud = *filtered_cloud_ptr;
         _prev_time_stamp = msg->header.stamp.sec;
 
@@ -328,7 +297,7 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl::PointCloud<pcl::PointXYZ>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr prev_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>(_prev_cloud));
+        pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>(_map_cloud));
         chrono::time_point<chrono::system_clock> start, end;
 
         start = chrono::system_clock::now(); 
@@ -339,7 +308,7 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         RCLCPP_INFO(this->get_logger(),to_string(current_cloud_ptr->size()));
         filterCloud(current_cloud_ptr, filtered_cloud_ptr);
         RCLCPP_INFO(this->get_logger(),to_string(filtered_cloud_ptr->size())); 
-        RCLCPP_INFO(this->get_logger(),to_string(prev_cloud_ptr->size())); 
+        RCLCPP_INFO(this->get_logger(),to_string(map_cloud_ptr->size())); 
         RCLCPP_INFO(this->get_logger(),"Cloud Callback \n"); 
         //cout<<"Filtered cloud has "<<filtered_cloud_ptr->size()<<"points"<<endl;
         //cout<<"Current cloud has "<<current_cloud_ptr->size()<<"points"<<endl;
@@ -349,10 +318,14 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         icp.setMaximumIterations(_max_iters);
         icp.setMaxCorrespondenceDistance(_max_correspondence_distance);
         icp.setEuclideanFitnessEpsilon(_euclidean_fitness_epsilon);
+
+        // Match to the previous Cloud
         //icp.setInputSource(_prev_cloud_ptr);
-        //icp.setInputTarget(_downsampled_cloud_ptr);
+
+        // Match to the Map Cloud
+        icp.setInputTarget(map_cloud_ptr);
+
         icp.setInputSource(filtered_cloud_ptr);
-        icp.setInputTarget(prev_cloud_ptr);
 
         double diff_time = msg->header.stamp.sec - _prev_time_stamp; //calculating time btw the matching pointclouds
 
@@ -361,6 +334,12 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         double del_x = diff_time*_speed;
         Eigen::Translation3f init_translation (del_x, 0.0, 0.0);
         Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix ();
+
+
+        //// init Guess is where GPS should be /////
+
+
+
 
         //cout<<"-------Matching clouds---------"<<endl;
         //start = chrono::system_clock::now(); 

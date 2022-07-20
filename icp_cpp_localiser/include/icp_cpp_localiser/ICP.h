@@ -4,7 +4,10 @@
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic pop
 
+#include "lifecycle_msgs/msg/transition.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
@@ -21,6 +24,7 @@ class ICP3D : public rclcpp::Node
          ICP3D();
 
     private:
+        //using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
         void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg); //point cloud callback
         void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg); //imu data callback
         
@@ -34,9 +38,9 @@ class ICP3D : public rclcpp::Node
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pc_sub_;
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub;
-        //rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub;
+        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub;
   
-        pcl::PointCloud<pcl::PointXYZ> _prev_cloud; //point cloud at the previous time instance
+        pcl::PointCloud<pcl::PointXYZ> _map_cloud; //point cloud of the pcd map
         Eigen::Matrix4f prev_transformation; //cumulative transformation until the previous time instance
         bool is_initial, is_imu_start; //boolean to tell if this is 1st iteration of the algo and start of imu reading
         double _prev_acc, _curr_acc; //accleration in consecutive time stamps
@@ -63,6 +67,8 @@ class ICP3D : public rclcpp::Node
         double _max_correspondence_distance; //correspondences with higher distances will be ignored
         double _speed; //speed for initial guess
         double _yaw_rate; //change in yaw for initial guess
+
+        std::string _map_path; //Path for PCD map
 
         // Had to change max iter, meak k and eps angle from int to double
 };
