@@ -9,6 +9,7 @@
 
 
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -65,6 +66,7 @@ ICP3D::ICP3D()
     this->declare_parameter("point_cloud_topic","/carla/ego_vehicle/lidar");
     this->declare_parameter("imu_topic","/carla/ego_vehicle/imu");
     this->declare_parameter("gnss_topic","/carla/ego_vehicle/gnss");
+    this->declare_parameter("odom_topic","/carla/ego_vehicle/odom");
     this->declare_parameter("pose_topic","icp_pose");
     this->declare_parameter("map_path","/icp_cpp_localiser/map.pcd");
 
@@ -106,7 +108,9 @@ ICP3D::ICP3D()
     this->get_parameter("imu_topic", _imu_topic);
     RCLCPP_INFO(this->get_logger(),"imu_topic: %s", _imu_topic.c_str()); 
     this->get_parameter("gnss_topic", _gnss_topic);
-    RCLCPP_INFO(this->get_logger(),"gnss_topic: %s", _gnss_topic.c_str()); 
+    RCLCPP_INFO(this->get_logger(),"gnss_topic: %s", _gnss_topic.c_str());
+    this->get_parameter("odom_topic", _odom_topic);
+    RCLCPP_INFO(this->get_logger(),"odom_topic: %s", _odom_topic.c_str());  
 
     this->get_parameter("pose_topic", _pose_topic);
     RCLCPP_INFO(this->get_logger(),"pose_topic: %s", _pose_topic.c_str()); 
@@ -118,9 +122,9 @@ ICP3D::ICP3D()
     pc_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(_point_cloud_topic, 1, std::bind(&ICP3D::cloudCallback, this, _1));
     imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(_imu_topic, 1, std::bind(&ICP3D::imuCallback, this, _1));
     gnss_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(_gnss_topic, 1, std::bind(&ICP3D::gnssCallback,this, _1));
+    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(_odom_topic, 1, std::bind(&ICP3D::odomCallback,this, _1));
     pose_pub = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(_pose_topic,1);
     map_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("the_map",rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
-
 
     //initialising values
     _prev_acc = 0.0;
@@ -275,26 +279,45 @@ void ICP3D::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 void ICP3D::gnssCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
     // Attempted conversion from lat long to pose
-    double lat_rad, lon_rad, R, x, y, z;
-    lat_rad = (double(msg->latitude)*M_PI/180 + M_PI) % (2 * M_PI) - M_PI;
-    lon_rad = (double(msg->longitude) * M_PI/180 + M_PI) % (2 * M_PI) - M_PI;
-    R = 6378135; // Aequatorradii
-    x = R * sin(lon_rad) * cos(lat_rad); // iO
-    y = R * sin(-lat_rad); // iO
-    z = msg->altitude;
+    //double lat_rad, lon_rad, R, x, y, z;
+    // lat_rad = (double(msg->latitude)*M_PI/180 + M_PI) % (2 * M_PI) - M_PI;
+    // lon_rad = (double(msg->longitude) * M_PI/180 + M_PI) % (2 * M_PI) - M_PI;
+    // R = 6378135; // Aequatorradii
+    // x = R * sin(lon_rad) * cos(lat_rad); // iO
+    // y = R * sin(-lat_rad); // iO
+    // z = msg->altitude;
+
     
 
     if(is_imu_start)
     {
-        RCLCPP_INFO(this->get_logger(),to_string(x));
+        // RCLCPP_INFO(this->get_logger(),to_string(msg->latitude));
+        // RCLCPP_INFO(this->get_logger(),to_string(x));
     }
     else
     {
-        RCLCPP_INFO(this->get_logger(),to_string(msg->altitude)); 
+        //RCLCPP_INFO(this->get_logger(),to_string(msg->transform)); 
     }
 
     return;
 }
+
+/* @brief Callback function to fetch GNSS data, to find initial position */
+void ICP3D::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+{
+    // Attempted conversion from lat long to pose
+    
+    // lat_rad = (double(msg->latitude)*M_PI/180 + M_PI) % (2 * M_PI) - M_PI;
+    // lon_rad = (double(msg->longitude) * M_PI/180 + M_PI) % (2 * M_PI) - M_PI;
+    // R = 6378135; // Aequatorradii
+    // x = R * sin(lon_rad) * cos(lat_rad); // iO
+    // y = R * sin(-lat_rad); // iO
+    // z = msg->altitude;
+
+    //RCLCPP_INFO(this->get_logger(),to_string(msg->pose->)); 
+
+}
+
 /* @brief Callback function for pointcloud, implements the ICP algo */
 void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
@@ -368,8 +391,6 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
 
         //// init Guess is where GPS should be /////
-
-
 
 
         //cout<<"-------Matching clouds---------"<<endl;
