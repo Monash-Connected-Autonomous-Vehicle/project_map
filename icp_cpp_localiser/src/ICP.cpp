@@ -253,10 +253,11 @@ void ICP3D::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 
         double del_time = _curr_imu_time - _prev_imu_time;
         double avg_acc = 0.5*(_prev_acc + _curr_acc);
+        
 
         _speed = avg_acc*del_time;
         _yaw_rate = msg->angular_velocity.z;
-
+       
         _prev_acc = _curr_acc;
         _prev_imu_time = _curr_imu_time;
     }
@@ -305,11 +306,11 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl::PCLPointCloud2 pcl_pc2;
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, *current_cloud_ptr);
-        RCLCPP_INFO(this->get_logger(),to_string(current_cloud_ptr->size()));
+        //RCLCPP_INFO(this->get_logger(),to_string(current_cloud_ptr->size()));
         filterCloud(current_cloud_ptr, filtered_cloud_ptr);
-        RCLCPP_INFO(this->get_logger(),to_string(filtered_cloud_ptr->size())); 
-        RCLCPP_INFO(this->get_logger(),to_string(map_cloud_ptr->size())); 
-        RCLCPP_INFO(this->get_logger(),"Cloud Callback \n"); 
+        //RCLCPP_INFO(this->get_logger(),to_string(filtered_cloud_ptr->size())); 
+        //RCLCPP_INFO(this->get_logger(),to_string(map_cloud_ptr->size())); 
+        //RCLCPP_INFO(this->get_logger(),"Cloud Callback \n"); 
         //cout<<"Filtered cloud has "<<filtered_cloud_ptr->size()<<"points"<<endl;
         //cout<<"Current cloud has "<<current_cloud_ptr->size()<<"points"<<endl;
 
@@ -332,14 +333,10 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         double diff_yaw = diff_time*_yaw_rate;
         Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
         double del_x = diff_time*_speed;
+        RCLCPP_INFO(this->get_logger(),"The speed:" + to_string(_speed));
+        RCLCPP_INFO(this->get_logger(),"The del x:" + to_string(del_x));
         Eigen::Translation3f init_translation (del_x, 0.0, 0.0);
         Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix ();
-
-
-        //// init Guess is where GPS should be /////
-
-
-
 
         //cout<<"-------Matching clouds---------"<<endl;
         //start = chrono::system_clock::now(); 
@@ -366,6 +363,24 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         mat << curr_transformation(0,0), curr_transformation(0,1), curr_transformation(0,2),
                 curr_transformation(1,0), curr_transformation(1,1), curr_transformation(1,2),
                 curr_transformation(2,0), curr_transformation(2,1), curr_transformation(2,2);
+
+        RCLCPP_INFO(this->get_logger(),"t(0,3)" + to_string(t(0,3))); 
+        RCLCPP_INFO(this->get_logger(),"t(1,3)" + to_string(t(1,3))); 
+        RCLCPP_INFO(this->get_logger(),"t(2,3)" + to_string(t(2,3))); 
+        RCLCPP_INFO(this->get_logger(),"t(0,0)" + to_string(t(0,0))); 
+        RCLCPP_INFO(this->get_logger(),"t(0,1)" + to_string(t(0,1))); 
+        RCLCPP_INFO(this->get_logger(),"t(0,2)" + to_string(t(0,2)));
+        RCLCPP_INFO(this->get_logger(),"t(1,0)" + to_string(t(1,0))); 
+        RCLCPP_INFO(this->get_logger(),"t(1,1)" + to_string(t(1,1))); 
+        RCLCPP_INFO(this->get_logger(),"t(1,2)" + to_string(t(1,2))); 
+        RCLCPP_INFO(this->get_logger(),"t(2,0)" + to_string(t(2,0))); 
+        RCLCPP_INFO(this->get_logger(),"t(2,1)" + to_string(t(2,1))); 
+        RCLCPP_INFO(this->get_logger(),"t(2,2)" + to_string(t(2,2)));       
+
+        RCLCPP_INFO(this->get_logger(),to_string(trans[0])); 
+        RCLCPP_INFO(this->get_logger(),to_string(trans[1])); 
+        RCLCPP_INFO(this->get_logger(),to_string(trans[2])); 
+
 
         Eigen::Quaternionf quat(mat); //rotation matrix stored as a quaternion
 
