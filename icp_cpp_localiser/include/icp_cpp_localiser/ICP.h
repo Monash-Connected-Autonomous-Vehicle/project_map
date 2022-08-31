@@ -17,6 +17,9 @@
 #include <pcl/common/common.h>
 #include <pcl/point_types.h>
 #include <pcl/PCLPointCloud2.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/transform_listener.h>
 
 class ICP3D : public rclcpp::Node
 {
@@ -27,6 +30,10 @@ class ICP3D : public rclcpp::Node
         //using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
         void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg); //point cloud callback
         void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg); //imu data callback
+
+        void tf_broadcast(Eigen::Matrix4f trans); // Transform Function
+        void tf_listener();
+        
         
         void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); //crops cloud using box filter
         void removeNoise(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); //removes noise using Statistical outlier removal
@@ -39,8 +46,14 @@ class ICP3D : public rclcpp::Node
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub;
         rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub;
+
+        std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+        std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+        std::shared_ptr<tf2_ros::TransformListener> transform_listener_;
+
   
         pcl::PointCloud<pcl::PointXYZ> _map_cloud; //point cloud of the pcd map
+        pcl::PointCloud<pcl::PointXYZ> _prev_cloud; //point cloud of the pcd map
         Eigen::Matrix4f prev_transformation; //cumulative transformation until the previous time instance
         bool is_initial, is_imu_start; //boolean to tell if this is 1st iteration of the algo and start of imu reading
         double _prev_acc, _curr_acc; //accleration in consecutive time stamps
@@ -68,7 +81,18 @@ class ICP3D : public rclcpp::Node
         double _speed; //speed for initial guess
         double _yaw_rate; //change in yaw for initial guess
 
+
+
         std::string _map_path; //Path for PCD map
+        //geometry_msgs::msg::PoseWithCovarianceStamped _curr_pose;
+
+        double _curr_pose_x;
+        double _curr_pose_y;
+        double _curr_pose_z;
+        double _curr_rot_x;
+        double _curr_rot_y;
+        double _curr_rot_z;
+        double _curr_rot_w;
 
         // Had to change max iter, meak k and eps angle from int to double
 };

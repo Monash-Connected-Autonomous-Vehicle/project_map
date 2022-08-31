@@ -16,10 +16,12 @@ class PathCreationNode(Node):
         self.path = Path()
 
     def odom_cb(self,data):
+        
         self.path.header = data.header
         pose = PoseStamped()
         pose.header = data.header
         pose.pose = data.pose.pose
+        print(len(self.path.poses))
         self.path.poses.append(pose)
         self.path_publisher.publish(self.path)
 

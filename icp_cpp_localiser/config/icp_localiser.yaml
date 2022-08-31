@@ -5,7 +5,7 @@ icp_localiser_node:
     pose_topic: "/my_icp_pose" #pose ros topic to which to publish
 
     leaf_size: 0.1 #leaf size for voxel grid
-    dist_threshold: 0.1 #distance threshold for RASNSAC to consider a point as inlier
+    dist_threshold: 2.5 #distance threshold for RASNSAC to consider a point as inlier
     eps_angle: 20.0 #allowed difference of angles in degrees for perpendicular plane model
     minX: 0.0 #min point of box filter
     minY: -25.0
@@ -18,7 +18,9 @@ icp_localiser_node:
 
     transformation_epsilon: 0.008 #minimum transformation difference for termination condition
     euclidean_fitness_epsilon: 0.1 #maximum allowed Euclidean error between two consecutive steps in the ICP loop
-    max_correspondence_distance: 1.5 #correspondences with higher distances will be ignored
+    max_correspondence_distance: 4.5 #correspondences with higher distances will be ignored
     max_iters: 75.0 #max number of registration iterations
-    map_path: "/home/mcav/liam_ws/localisation/pointclouds/good_map.pcd"
-    #map_path: "/home/mcav/liam_ws/localisation/localisation_ws/src/project_map/icp_cpp_localiser/good_output.pcd"
+    #map_path: "/home/mcav/liam_ws/localisation/pointclouds/good_map.pcd"
+    map_path: "/home/mcav/liam_ws/localisation/pointclouds/right_corner_map.pcd"
+    #map_path: "/home/mcav/liam_ws/localisation/pointclouds/good_output.pcd"
+    #use_sim_time: FALSE
