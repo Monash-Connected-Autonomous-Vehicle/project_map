@@ -13,6 +13,7 @@
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+#define BOOST_BIND_NO_PLACEHOLDERS // this must go before pcl imports to prevent "ambiguous placeholder" error: https://answers.ros.org/question/379224/error-reference-to-_1-is-ambiguous/
 #include <pcl/conversions.h>
 #include <pcl/ModelCoefficients.h>
 
@@ -375,8 +376,10 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         //---------so this can used as input to probabilistic filter like EKF/UKF----
         pose_pub->publish(curr_pose); //publishing the current pose
         RCLCPP_INFO(this->get_logger(),"Publishing Pose");
-        RCLCPP_INFO(this->get_logger(),"Trans XYZ:" + to_string(_curr_pose_x) + ", "  + to_string(_curr_pose_y) + ", "  + to_string(_curr_pose_z));
-        RCLCPP_INFO(this->get_logger(),"ROT XYZW:" + to_string(_curr_rot_x)  + ", "  + to_string(_curr_rot_y) + ", "  + to_string(_curr_rot_z) + ", "  + to_string(_curr_rot_w)); 
+        auto translation_string = "Trans XYZ:" + to_string(_curr_pose_x) + ", "  + to_string(_curr_pose_y) + ", "  + to_string(_curr_pose_z);
+        RCLCPP_INFO(this->get_logger(), translation_string.c_str());
+        auto rotation_string = "ROT XYZW:" + to_string(_curr_rot_x)  + ", "  + to_string(_curr_rot_y) + ", "  + to_string(_curr_rot_z) + ", "  + to_string(_curr_rot_w);
+        RCLCPP_INFO(this->get_logger(), rotation_string.c_str()); 
 
         prev_transformation = t;
         _prev_time_stamp = msg->header.stamp.sec;
