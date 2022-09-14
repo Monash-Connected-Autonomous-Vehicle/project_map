@@ -96,11 +96,11 @@ ament_package()
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(
-#   include
-#   ${catkin_INCLUDE_DIRS}
-#   ${PCL_INCLUDE_DIRS}
-# )
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+)
 
 # add_executable(icp_node src/ICP_node.cpp src/ICP.cpp)
 # target_link_libraries(icp_node ${catkin_LIBRARIES} ${PCL_LIBRARIES})
