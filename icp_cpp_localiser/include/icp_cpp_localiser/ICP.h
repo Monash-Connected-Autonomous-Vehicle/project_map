@@ -4,7 +4,6 @@
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic pop
 
-#include "lifecycle_msgs/msg/transition.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
@@ -28,13 +27,11 @@ class ICP3D : public rclcpp::Node
          ICP3D();
 
     private:
-        //using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
         void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg); //point cloud callback
         void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg); //imu data callback
 
         void tf_broadcast(Eigen::Matrix4f trans); // Transform Function
         void tf_listener();
-        
         
         void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); //crops cloud using box filter
         void removeNoise(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); //removes noise using Statistical outlier removal
@@ -55,8 +52,8 @@ class ICP3D : public rclcpp::Node
   
         pcl::PointCloud<pcl::PointXYZ> _map_cloud; //point cloud of the pcd map
         pcl::PointCloud<pcl::PointXYZ> _prev_cloud; //point cloud of the pcd map
-        Eigen::Matrix4f prev_transformation; //cumulative transformation until the previous time instance
-        bool is_initial, is_imu_start; //boolean to tell if this is 1st iteration of the algo and start of imu reading
+        Eigen::Matrix4f _prev_transformation; //cumulative transformation until the previous time instance
+        bool _is_initial, _is_imu_start; //boolean to tell if this is 1st iteration of the algo and start of imu reading
         double _prev_acc, _curr_acc; //accleration in consecutive time stamps
         double _prev_imu_time, _curr_imu_time; //consecutive time stamps of imu data 
         double _prev_time_stamp; //time stamp of the previous point cloud
@@ -95,7 +92,7 @@ class ICP3D : public rclcpp::Node
         double _curr_rot_z;
         double _curr_rot_w;
 
-        // Had to change max iter, meak k and eps angle from int to double
+        // Had to change max iter, mean k and eps angle from int to double
 };
 
 #endif

@@ -13,7 +13,7 @@ endif()
 
 # add_executable(icp_localiser src/icp_cpp_node.cpp)
 # target_link_libraries(icp_localiser ${PCL_Libraries})
-add_executable(icp_localiser_node src/ICP_node.cpp src/ICP.cpp) # Add executable needs a main function - just add these two files into executble
+add_executable(icp_localiser_node src/ICP_node.cpp src/ICP.cpp) # Add executable needs a main function - just add these two files into executable
 
 # ament_target_dependencies(icp_localiser rclcpp std_msgs PCL)
 # # uncomment the following section in order to fill in
