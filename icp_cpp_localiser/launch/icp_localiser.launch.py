@@ -8,7 +8,7 @@ from launch.substitutions import LaunchConfiguration
 from launch.actions import DeclareLaunchArgument
 
 def generate_launch_description():
-   use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+   use_sim_time = LaunchConfiguration('use_sim_time', default='true')
 
    config = os.path.join(
       get_package_share_directory('icp_cpp_localiser'),
@@ -20,7 +20,7 @@ def generate_launch_description():
       DeclareLaunchArgument(
          'use_sim_time',
          default_value='false',
-         description='Use simulation (Gazebo) clock if true'),
+         description='Use simulation (Carla) clock if true'),
       Node(
          package='icp_cpp_localiser',
          executable='icp_localiser_node',
