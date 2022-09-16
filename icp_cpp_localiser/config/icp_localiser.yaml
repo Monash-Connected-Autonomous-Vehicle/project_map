@@ -1,26 +1,38 @@
 icp_localiser_node:
   ros__parameters:
+
+    use_sim_time: true
     point_cloud_topic: "/carla/ego_vehicle/lidar" #point cloud ros topic to subscribe to
     imu_topic: "/carla/ego_vehicle/imu" #imu ros topic to subscribe to
     pose_topic: "/my_icp_pose" #pose ros topic to which to publish
 
-    leaf_size: 0.1 #leaf size for voxel grid
-    dist_threshold: 2.5 #distance threshold for RASNSAC to consider a point as inlier
+    # Downsample Filter
+    leaf_size: 1.0 #leaf size for voxel grid
+
+    # Ground Filtering
+    dist_threshold: 0.5 #distance threshold for RASNSAC to consider a point as inlier
     eps_angle: 20.0 #allowed difference of angles in degrees for perpendicular plane model
+
+    # Box Filtering
     minX: 0.0 #min point of box filter
     minY: -25.0
     minZ: -3.0
     maxX: 50.0 #max point of box filter
     maxY: 25.0
     maxZ: 3.0
+
+    # Noise Filtering
     mean_k: 50.0 #number of neighbors to analyze for each point for noise removal
     std_mul: 1.5 #standard deviation multiplication threshold for noise removal
 
-    transformation_epsilon: 0.008 #minimum transformation difference for termination condition
+    # ICP Parameters
+    transformation_epsilon: 0.08 #minimum transformation difference for termination condition
     euclidean_fitness_epsilon: 0.1 #maximum allowed Euclidean error between two consecutive steps in the ICP loop
-    max_correspondence_distance: 4.5 #correspondences with higher distances will be ignored
+    max_correspondence_distance: 1.5 #correspondences with higher distances will be ignored
     max_iters: 75.0 #max number of registration iterations
-    #map_path: "/home/mcav/liam_ws/localisation/pointclouds/good_map.pcd"
-    map_path: "/home/mcav/liam_ws/localisation/pointclouds/right_corner_map.pcd"
+
+
+    map_path: "/home/mcav/liam_ws/localisation/pointclouds/10kmhsquare_Voxel.pcd"
+    #map_path: "/home/mcav/liam_ws/localisation/pointclouds/right_corner_map.pcd"
     #map_path: "/home/mcav/liam_ws/localisation/pointclouds/good_output.pcd"
     #use_sim_time: FALSE

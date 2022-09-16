@@ -155,7 +155,6 @@ void ICP3D::cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pc
     boxFilter.setMin(Eigen::Vector4f(_minX, _minY, _minZ, 1.0));
     boxFilter.setMax(Eigen::Vector4f(_maxX, _maxY, _maxZ, 1.0));
     boxFilter.setInputCloud(in_cloud_ptr);
-    // This filter is not working ////// Please fix
     boxFilter.filter(*out_cloud_ptr); 
     //cout<<"Crop Input: "<<in_cloud_ptr->size()<<" pts, Crop output: "<<out_cloud_ptr->size()<<" pts"<<endl;
     return;
@@ -191,7 +190,6 @@ void ICP3D::removeGround(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
                             pcl::PointCloud<pcl::PointXYZ>::Ptr ground_plane_ptr)
 {
     //cout<<"-------Removing ground---------"<<endl;
-    
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
     pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
     //Creating the segmentation object
@@ -235,15 +233,9 @@ void ICP3D::filterCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, 
     
     //pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
-    // Error coming from filter in cropCloud for incoming scans ////////
-    // cropCloud(in_cloud_ptr, cropped_cloud_ptr);
-
-    // Errors for map coming from
+    cropCloud(in_cloud_ptr, cropped_cloud_ptr);
     removeGround(in_cloud_ptr, no_ground_cloud_ptr, only_ground_cloud_ptr);
-    // RCLCPP_INFO(this->get_logger(),to_string(no_ground_cloud_ptr->size())); 
-    // RCLCPP_INFO(this->get_logger(),"No Ground Loaded \n"); 
     removeNoise(no_ground_cloud_ptr, no_noise_cloud_ptr);
-    //removeNoise(no_ground_cloud_ptr, out_cloud_ptr);
     downsampleCloud(no_noise_cloud_ptr, out_cloud_ptr);
 
     return;
@@ -252,7 +244,6 @@ void ICP3D::filterCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, 
 /* @brief Callback function to fetch IMU data, calculates speed and change in yaw */
 void ICP3D::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
-    RCLCPP_INFO(this->get_logger(),"IMU Callback \n"); 
     if(is_imu_start)
     {
         _prev_acc = msg->linear_acceleration.x;
@@ -285,7 +276,9 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr incoming_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        //pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         if (pcl::io::loadPCDFile(_map_path, *incoming_cloud_ptr) == -1) //* load the file
         {
             RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
@@ -294,16 +287,25 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
             //filterCloud(incoming_cloud_ptr, filtered_map_ptr);
             sensor_msgs::msg::PointCloud2::SharedPtr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
             pcl::toROSMsg(*incoming_cloud_ptr, *map_msg_ptr);
+            removeGround(incoming_cloud_ptr, no_ground_map_ptr, only_ground_map_ptr);
+            removeNoise(no_ground_map_ptr, filtered_map_ptr);
             map_msg_ptr->header.frame_id = "the_map";
             map_pub->publish(*map_msg_ptr);
-            _map_cloud = *incoming_cloud_ptr;
+            //_map_cloud = *incoming_cloud_ptr;
+            _map_cloud = *filtered_map_ptr;
         }
 
         _prev_time_stamp = msg->header.stamp.sec;
 
         //Initialising the previous transformation
         // This would be good for initial pose estimation (if car doesn't start at 0 position)
-        prev_transformation = Eigen::Matrix4f::Identity();
+        // prev_transformation = Eigen::Matrix4f::Identity();
+
+        // New initial position (80.6,0,0,0,0) -> for better mapping
+        Eigen::AngleAxisf init_rotation(0.0, Eigen::Vector3f::UnitZ ());
+        Eigen::Translation3f init_translation (80, 0.0, 2.0);
+        prev_transformation = (init_translation * init_rotation).matrix ();
+
 
         is_initial = false;
     }
@@ -333,24 +335,30 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
         ///////////////////////// USING IMU ////////////////////////////////////
         double diff_time = msg->header.stamp.sec - _prev_time_stamp; //calculating time btw the matching pointclouds
+        
+        // Weird diff_time = 1 -> seems to be sending out the ICP
+        if (diff_time > 0.5){diff_time = 0.0;}
+
         double diff_yaw = diff_time*_yaw_rate;
+        RCLCPP_INFO(this->get_logger(),to_string(diff_yaw));
         //Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
         Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
         double del_x = diff_time*_speed;
         Eigen::Translation3f init_translation (del_x, 0.0, 0.0);
         Eigen::Matrix4f init_guess_imu = (init_translation * init_rotation).matrix ();
         Eigen::Matrix4f init_guess = init_guess_imu*prev_transformation;
-        /////////////////////////////////////////////////////////////////////////////////        
+        /////////////////////////////////////////////////////////////////////////////////      
 
         // Use this instead if you want to use IMu corrections
-        //Eigen::Matrix4f init_guess = prev_transformation;
+        // Eigen::Matrix4f init_guess = prev_transformation;
 
         // Matching CLouds
         start = chrono::system_clock::now(); 
         icp.align(*transformed_cloud_ptr, init_guess);
         end = chrono::system_clock::now();
         chrono::duration<double> elapsed_seconds = end - start;
-        RCLCPP_INFO(this->get_logger(),"ICP has converged");// in: " + to_string(elapsed_seconds) + " with Fitness score: " + to_string(icp.getFitnessScore()));
+        RCLCPP_INFO(this->get_logger(),"ICP has converged");
+        RCLCPP_INFO(this->get_logger(),"ICP Fitness Score: " + to_string(icp.getFitnessScore()));/// in: " + to_string(elapsed_seconds) + " with Fitness score: " + to_string(icp.getFitnessScore()));
 
         Eigen::Matrix4f t = icp.getFinalTransformation();
 
@@ -375,8 +383,8 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         //---------so this can used as input to probabilistic filter like EKF/UKF----
         pose_pub->publish(curr_pose); //publishing the current pose
         RCLCPP_INFO(this->get_logger(),"Publishing Pose");
-        RCLCPP_INFO(this->get_logger(),"Trans XYZ:" + to_string(_curr_pose_x) + ", "  + to_string(_curr_pose_y) + ", "  + to_string(_curr_pose_z));
-        RCLCPP_INFO(this->get_logger(),"ROT XYZW:" + to_string(_curr_rot_x)  + ", "  + to_string(_curr_rot_y) + ", "  + to_string(_curr_rot_z) + ", "  + to_string(_curr_rot_w)); 
+        //RCLCPP_INFO(this->get_logger(),"Trans XYZ:" + to_string(_curr_pose_x) + ", "  + to_string(_curr_pose_y) + ", "  + to_string(_curr_pose_z));
+        //RCLCPP_INFO(this->get_logger(),"ROT XYZW:" + to_string(_curr_rot_x)  + ", "  + to_string(_curr_rot_y) + ", "  + to_string(_curr_rot_z) + ", "  + to_string(_curr_rot_w)); 
 
         prev_transformation = t;
         _prev_time_stamp = msg->header.stamp.sec;
@@ -385,7 +393,8 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 }
 
 void ICP3D::tf_broadcast(Eigen::Matrix4f trans){
-    rclcpp::Time now = this->get_clock()->now();
+    //rclcpp::Time now = this->get_clock()->now();
+    rclcpp::Time now = now();
     geometry_msgs::msg::TransformStamped t;
 
     Eigen::Quaternionf q(trans.topLeftCorner<3, 3>());
