@@ -41,6 +41,8 @@ class ICP3D : public rclcpp::Node
         void removeGround(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr, 
                                 pcl::PointCloud<pcl::PointXYZ>::Ptr ground_plane_ptr); //ground removal using RANSAC
         void filterCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); //filtering the point cloud
+        Eigen::Matrix4f initialisePose(const pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud_ptr, const pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr, const Eigen::Matrix4f initial_guess, float search_width, float resolution);
+        std::vector<double> linspace(float start_in, float end_in, int num_in);
 
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pc_sub_;
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
@@ -93,6 +95,20 @@ class ICP3D : public rclcpp::Node
         double _curr_rot_y;
         double _curr_rot_z;
         double _curr_rot_w;
+
+        // Pose Recovery
+        double _search_width;
+        float _resolution_points_recov;
+        int _fit_score;
+        int _recov_fit_score;
+
+        // Pose Initialisation
+        double _search_width_init;
+        float _resolution_points_init;
+        double _init_x;
+        double _init_y;
+        double _init_z;
+
 
         // Had to change max iter, meak k and eps angle from int to double
 };

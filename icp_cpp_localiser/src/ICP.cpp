@@ -44,6 +44,7 @@ using std::placeholders::_1;
 
 using namespace std;
 
+
 /* @brief Constructor */
 ICP3D::ICP3D()
 : Node("icp_localiser_node")
@@ -64,6 +65,16 @@ ICP3D::ICP3D()
     this->declare_parameter("max_iters",75.0); ///
     this->declare_parameter("euclidean_fitness_epsilon",0.1);
     this->declare_parameter("max_correspondence_distance",1.0);
+
+    this->declare_parameter("fit_score",3);
+    this->declare_parameter("recov_fit_score",2);
+    this->declare_parameter("resolution_points_init",1.5);
+    this->declare_parameter("resolution_points_recov",2.0);
+    this->declare_parameter("init_x",70.0);
+    this->declare_parameter("init_y",0.0);
+    this->declare_parameter("init_z",2.0);
+
+
     // Had to change while using ros2 run instead of Launch ///////////////
     this->declare_parameter("point_cloud_topic","/carla/ego_vehicle/lidar"); //velodyne_points
     this->declare_parameter("imu_topic","/carla/ego_vehicle/imu");
@@ -103,6 +114,14 @@ ICP3D::ICP3D()
     this->get_parameter("max_correspondence_distance", _max_correspondence_distance);
     RCLCPP_INFO(this->get_logger(),"max_correspondence_distance: %f", _max_correspondence_distance);  
  
+    this->get_parameter("fit_score", _fit_score);
+    this->get_parameter("recov_fit_score", _recov_fit_score);
+    this->get_parameter("resolution_points_init", _resolution_points_init);
+    this->get_parameter("resolution_points_init", _resolution_points_recov);
+    this->get_parameter("init_x", _init_x);
+    this->get_parameter("init_y", _init_y);
+    this->get_parameter("init_z", _init_z);
+
     this->get_parameter("point_cloud_topic", _point_cloud_topic);
     RCLCPP_INFO(this->get_logger(),"point_cloud_topic: %s", _point_cloud_topic.c_str());  
     this->get_parameter("imu_topic", _imu_topic);
@@ -143,9 +162,143 @@ ICP3D::ICP3D()
     is_initial = true;
     is_imu_start = true;
 
+
     // Check for path to find pcd map
     boost::filesystem::path full_path(boost::filesystem::current_path());
     std::cout << "Current path is : " << full_path << std::endl;
+}
+
+Eigen::Matrix4f ICP3D::initialisePose(const pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud_ptr, const pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr, const Eigen::Matrix4f initial_guess, float search_width, float resolution)
+{
+    RCLCPP_INFO(this->get_logger(),"Starting Pose Recovery function");
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+    icp.setTransformationEpsilon(_transformation_epsilon);
+    icp.setMaximumIterations(_max_iters);
+    icp.setMaxCorrespondenceDistance(_max_correspondence_distance);
+    icp.setEuclideanFitnessEpsilon(_euclidean_fitness_epsilon);
+
+    // Match to the Map Cloud
+    icp.setInputTarget(map_cloud_ptr);
+    // Set Incoming Clouud as Source
+    icp.setInputSource(filtered_cloud_ptr);
+
+    // NOTE FIX Z
+    Eigen::Translation3f init_trans (0, 0, 2);
+    Eigen::AngleAxisf init_rotation (0, Eigen::Vector3f::UnitZ ());
+
+    // Search space centred square on last position
+    // std::vector<double> x_search = linspace(initial_guess(0,3) - search_width/2,initial_guess(0,3)+ search_width/2, resolution);
+    // std::vector<double> y_search = linspace(initial_guess(1,3) - search_width/2,initial_guess(1,3)+ search_width/2, resolution);
+    
+    // for(auto& itx : x_search){
+    //     for(auto& ity : y_search){
+    //         RCLCPP_INFO(this->get_logger(),"X guess: " + to_string(itx));
+    //         RCLCPP_INFO(this->get_logger(),"Y guess: " + to_string(ity));
+    //         Eigen::Translation3f init_translation(itx, ity, 2);
+    //         Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix();
+    //         icp.align(*transformed_cloud_ptr, init_guess);
+    //         float fit_score = icp.getFitnessScore();
+    //         //RCLCPP_INFO(this->get_logger(),"ICP recovery has converged");
+    //         RCLCPP_INFO(this->get_logger(),"ICP Recvoery Fitness Score: " + to_string(fit_score));
+    //         if (fit_score < _recov_fit_score){
+    //             Eigen::Matrix4f t = icp.getFinalTransformation();
+    //             RCLCPP_INFO(this->get_logger(),"Found Solution");
+    //             return t;
+    //         }
+    //     }
+    // }
+
+    // Search Space increasing spiral
+    float fit_score = 1000;
+    float itx = initial_guess(0,3);
+    float ity = initial_guess(1,3);
+
+    bool change_x = true;
+    bool add = true;
+    int counter = 0;
+    int max = 1;
+
+    while (fit_score > _recov_fit_score){
+        // Spiralling
+        if (change_x){
+            if (add){itx = itx + resolution;}
+            else{itx = itx - resolution;}
+        }
+        else {
+            if (add){ity = ity + resolution;}
+            else{ity = ity - resolution;}
+        }
+        counter = counter + 1;
+
+        RCLCPP_INFO(this->get_logger(),"X guess: " + to_string(itx));
+        RCLCPP_INFO(this->get_logger(),"Y guess: " + to_string(ity));
+
+        Eigen::Translation3f init_translation(itx, ity, 2);
+        Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix();
+        icp.align(*transformed_cloud_ptr, init_guess);
+        fit_score = icp.getFitnessScore();
+
+        if (counter == max){
+            counter = 0;
+            if (change_x) {
+                change_x = false;
+                }
+            else {
+                max = max + 1;
+                if (add) {
+                    add = false;
+                    change_x = true;
+                    }
+                else {
+                    change_x = true;
+                    add = true;
+                } 
+            }
+        }
+    }
+
+    // Eigen::Translation3f init_translation(itx, ity, 2);
+    // Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix();
+    // icp.align(*transformed_cloud_ptr, init_guess);
+    // float fit_score = icp.getFitnessScore();
+
+
+    // No solution
+    // Eigen::AngleAxisf no_rotation (0, Eigen::Vector3f::UnitZ ());
+    // Eigen::Translation3f no_translation (0, 0.0, 0.0);
+    // Eigen::Matrix4f no_solution_matrix = (no_translation * no_rotation).matrix ();
+    // RCLCPP_INFO(this->get_logger(),"Did not find solution");
+    Eigen::Matrix4f t = icp.getFinalTransformation();
+    return t;
+}
+
+
+std::vector<double> ICP3D::linspace(float start_in, float end_in, int num_in) {
+
+  std::vector<double> linspaced;
+
+  double start = static_cast<double>(start_in);
+  double end = static_cast<double>(end_in);
+  double num = static_cast<double>(num_in);
+
+  if (num == 0) { return linspaced; }
+  if (num == 1) 
+    {
+      linspaced.push_back(start);
+      return linspaced;
+    }
+
+  double delta = (end - start) / (num - 1);
+
+  for(int i=0; i < num-1; ++i)
+    {
+      linspaced.push_back(start + delta * i);
+    }
+  linspaced.push_back(end); // I want to ensure that start and end
+                            // are exactly the same as the input
+  return linspaced;
 }
 
 /* @brief Cropping the cloud using Box filter */
@@ -274,28 +427,37 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     if(is_initial)
     {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr incoming_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        RCLCPP_INFO(this->get_logger(),"Initialising Pose");
+        // Loading Map
+        pcl::PointCloud<pcl::PointXYZ>::Ptr incoming_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        //pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        if (pcl::io::loadPCDFile(_map_path, *incoming_cloud_ptr) == -1) //* load the file
+        if (pcl::io::loadPCDFile(_map_path, *incoming_map_ptr) == -1) //* load the file
         {
             RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
         }
         else {
             //filterCloud(incoming_cloud_ptr, filtered_map_ptr);
             sensor_msgs::msg::PointCloud2::SharedPtr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
-            pcl::toROSMsg(*incoming_cloud_ptr, *map_msg_ptr);
-            removeGround(incoming_cloud_ptr, no_ground_map_ptr, only_ground_map_ptr);
+            pcl::toROSMsg(*incoming_map_ptr, *map_msg_ptr);
+            removeGround(incoming_map_ptr, no_ground_map_ptr, only_ground_map_ptr);
             removeNoise(no_ground_map_ptr, filtered_map_ptr);
             map_msg_ptr->header.frame_id = "the_map";
             map_pub->publish(*map_msg_ptr);
-            //_map_cloud = *incoming_cloud_ptr;
             _map_cloud = *filtered_map_ptr;
         }
-
+        pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>(_map_cloud));
         _prev_time_stamp = msg->header.stamp.sec;
+
+        // Incoming Lidar
+        pcl::PointCloud<pcl::PointXYZ>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PCLPointCloud2 pcl_pc2;
+        pcl_conversions::toPCL(*msg, pcl_pc2);
+        pcl::fromPCLPointCloud2(pcl_pc2, *current_cloud_ptr);
+        filterCloud(current_cloud_ptr, filtered_cloud_ptr);
 
         //Initialising the previous transformation
         // This would be good for initial pose estimation (if car doesn't start at 0 position)
@@ -303,10 +465,9 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
         // New initial position (80.6,0,0,0,0) -> for better mapping
         Eigen::AngleAxisf init_rotation(0.0, Eigen::Vector3f::UnitZ ());
-        Eigen::Translation3f init_translation (80, 0.0, 2.0);
-        prev_transformation = (init_translation * init_rotation).matrix ();
-
-
+        Eigen::Translation3f init_translation (_init_x, _init_y, _init_z);
+        Eigen::Matrix4f init_guess= (init_translation * init_rotation).matrix ();
+        prev_transformation  = initialisePose(map_cloud_ptr,  filtered_cloud_ptr, init_guess, 10,  _resolution_points_init);
         is_initial = false;
     }
     else {
@@ -340,7 +501,6 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         if (diff_time > 0.5){diff_time = 0.0;}
 
         double diff_yaw = diff_time*_yaw_rate;
-        RCLCPP_INFO(this->get_logger(),to_string(diff_yaw));
         //Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
         Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
         double del_x = diff_time*_speed;
@@ -361,6 +521,15 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         RCLCPP_INFO(this->get_logger(),"ICP Fitness Score: " + to_string(icp.getFitnessScore()));/// in: " + to_string(elapsed_seconds) + " with Fitness score: " + to_string(icp.getFitnessScore()));
 
         Eigen::Matrix4f t = icp.getFinalTransformation();
+
+
+        // Enter Pose Recovery
+        if (icp.getFitnessScore()>_fit_score){
+            RCLCPP_INFO(this->get_logger(),"ICP Failing - Recovery Process Begun");
+            // icp.recoveryfunction(filtered_cloud_ptr, map_cloud_ptr, init_pose)
+            t = initialisePose(map_cloud_ptr,  filtered_cloud_ptr,init_guess, 10, _resolution_points_recov);
+            }
+
 
         // Broadcast Transformation Matrix
         tf_broadcast(t);
@@ -385,7 +554,6 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         RCLCPP_INFO(this->get_logger(),"Publishing Pose");
         //RCLCPP_INFO(this->get_logger(),"Trans XYZ:" + to_string(_curr_pose_x) + ", "  + to_string(_curr_pose_y) + ", "  + to_string(_curr_pose_z));
         //RCLCPP_INFO(this->get_logger(),"ROT XYZW:" + to_string(_curr_rot_x)  + ", "  + to_string(_curr_rot_y) + ", "  + to_string(_curr_rot_z) + ", "  + to_string(_curr_rot_w)); 
-
         prev_transformation = t;
         _prev_time_stamp = msg->header.stamp.sec;
     }
@@ -394,7 +562,7 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
 void ICP3D::tf_broadcast(Eigen::Matrix4f trans){
     //rclcpp::Time now = this->get_clock()->now();
-    rclcpp::Time now = now();
+    rclcpp::Time now = rclcpp::Node::now();
     geometry_msgs::msg::TransformStamped t;
 
     Eigen::Quaternionf q(trans.topLeftCorner<3, 3>());
@@ -429,7 +597,7 @@ void ICP3D::tf_broadcast(Eigen::Matrix4f trans){
 }
 
 
-// CURRENTLY NOT IN USE
+// CURRENTLY NOT IN USE ///////
 void ICP3D::tf_listener(){
     //RCLCPP_INFO(this->get_logger(),"Getting Pose\n"); 
     geometry_msgs::msg::TransformStamped transformStamped;
