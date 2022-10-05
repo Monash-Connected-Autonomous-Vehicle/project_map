@@ -31,6 +31,14 @@ icp_localiser_node:
     max_correspondence_distance: 1.5 #correspondences with higher distances will be ignored
     max_iters: 75.0 #max number of registration iterations
 
+    fit_score: 3
+    recov_fit_score: 2
+
+    resolution_points_init: 1.5
+    resolution_points_recov: 3.0
+    init_x:  70.0
+    init_y: 0.0
+    init_z: 2.0
 
     map_path: "/home/mcav/liam_ws/localisation/pointclouds/10kmhsquare_Voxel.pcd"
     #map_path: "/home/mcav/liam_ws/localisation/pointclouds/right_corner_map.pcd"
