@@ -82,6 +82,8 @@ ICP3D::ICP3D()
     this->declare_parameter("map_path","/home/mcav/liam_ws/localisation/pointclouds/less_points_good_map.pcd");
 
     /* Loading parameters */
+    this->get_parameter("use_sim_time", _use_sim_time);
+    RCLCPP_INFO(this->get_logger(),"use_sim_time: %f", _use_sim_time);
     this->get_parameter("leaf_size", _leaf_size);
     RCLCPP_INFO(this->get_logger(),"leaf_size: %f", _leaf_size);
     this->get_parameter("dist_threshold", _dist_threshold);
@@ -162,6 +164,35 @@ ICP3D::ICP3D()
     is_initial = true;
     is_imu_start = true;
 
+    // Loading Map
+    pcl::PointCloud<pcl::PointXYZ>::Ptr incoming_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr no_noise_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    if (pcl::io::loadPCDFile(_map_path, *incoming_map_ptr) == -1) //* load the file
+    {
+        RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
+    }
+    else {
+        //filterCloud(incoming_cloud_ptr, filtered_map_ptr);
+        sensor_msgs::msg::PointCloud2::SharedPtr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
+        pcl::toROSMsg(*incoming_map_ptr, *map_msg_ptr);
+        removeGround(incoming_map_ptr, no_ground_map_ptr, only_ground_map_ptr);
+        RCLCPP_INFO(this->get_logger(),"Removing ground done \n"); 
+        removeNoise(no_ground_map_ptr, no_noise_map_ptr);
+        RCLCPP_INFO(this->get_logger(),"Removing noise done \n"); 
+        downsampleCloud(no_noise_map_ptr, filtered_map_ptr);
+        RCLCPP_INFO(this->get_logger(),"Filtered Map \n"); 
+        map_msg_ptr->header.frame_id = "the_map";
+        RCLCPP_INFO(this->get_logger(),to_string(no_ground_map_ptr->size())); 
+        RCLCPP_INFO(this->get_logger(),to_string(filtered_map_ptr->size())); 
+        //pcl::toROSMsg(*filtered_map_ptr, *map_msg_ptr);
+        map_pub->publish(*map_msg_ptr);
+
+        RCLCPP_INFO(this->get_logger(),"Post Publish\n"); 
+        _map_cloud = *filtered_map_ptr;
+    }
 
     // Check for path to find pcd map
     boost::filesystem::path full_path(boost::filesystem::current_path());
@@ -239,6 +270,7 @@ Eigen::Matrix4f ICP3D::initialisePose(const pcl::PointCloud<pcl::PointXYZ>::Ptr 
         Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix();
         icp.align(*transformed_cloud_ptr, init_guess);
         fit_score = icp.getFitnessScore();
+        RCLCPP_INFO(this->get_logger(),"Fitness Score " + to_string(fit_score));
 
         if (counter == max){
             counter = 0;
@@ -357,7 +389,7 @@ void ICP3D::removeGround(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
     seg.segment(*inliers, *coefficients);
     if(inliers->indices.size() == 0)
     {
-        std::cout<<"Could not estimate the plane"<<endl;
+        RCLCPP_INFO(this->get_logger(),"Could not estimate the plane");
     }
 
     //Remove ground from the cloud
@@ -370,6 +402,8 @@ void ICP3D::removeGround(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
     //Extract ground from the cloud
     extract.setNegative(false); //false leaves only the indices
     extract.filter(*ground_plane_ptr);
+    //RCLCPP_INFO(this->get_logger(),to_string(out_cloud_ptr->size()));
+    //RCLCPP_INFO(this->get_logger(),to_string(ground_plane_ptr->size()));
 
     //cout<<"GR Input: "<<in_cloud_ptr->size()<<" pts, GR output: "<<out_cloud_ptr->size()<<" pts"<<endl;
 
@@ -428,25 +462,6 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     if(is_initial)
     {
         RCLCPP_INFO(this->get_logger(),"Initialising Pose");
-        // Loading Map
-        pcl::PointCloud<pcl::PointXYZ>::Ptr incoming_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_map_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        if (pcl::io::loadPCDFile(_map_path, *incoming_map_ptr) == -1) //* load the file
-        {
-            RCLCPP_INFO(this->get_logger(),"Couldn't read file map.pcd \n"); 
-        }
-        else {
-            //filterCloud(incoming_cloud_ptr, filtered_map_ptr);
-            sensor_msgs::msg::PointCloud2::SharedPtr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
-            pcl::toROSMsg(*incoming_map_ptr, *map_msg_ptr);
-            removeGround(incoming_map_ptr, no_ground_map_ptr, only_ground_map_ptr);
-            removeNoise(no_ground_map_ptr, filtered_map_ptr);
-            map_msg_ptr->header.frame_id = "the_map";
-            map_pub->publish(*map_msg_ptr);
-            _map_cloud = *filtered_map_ptr;
-        }
         pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>(_map_cloud));
         _prev_time_stamp = msg->header.stamp.sec;
 
@@ -480,7 +495,8 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, *current_cloud_ptr);
         filterCloud(current_cloud_ptr, filtered_cloud_ptr);
-
+        //RCLCPP_INFO(this->get_logger(),"No. Point Incoming: " + to_string(current_cloud_ptr->size())); 
+        //RCLCPP_INFO(this->get_logger(),"No. Points Filter: " + to_string(filtered_cloud_ptr->size())); 
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
         icp.setTransformationEpsilon(_transformation_epsilon);
         icp.setMaximumIterations(_max_iters);
@@ -495,22 +511,22 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
 
         ///////////////////////// USING IMU ////////////////////////////////////
-        double diff_time = msg->header.stamp.sec - _prev_time_stamp; //calculating time btw the matching pointclouds
+        // double diff_time = msg->header.stamp.sec - _prev_time_stamp; //calculating time btw the matching pointclouds
         
-        // Weird diff_time = 1 -> seems to be sending out the ICP
-        if (diff_time > 0.5){diff_time = 0.0;}
+        // // Weird diff_time = 1 -> seems to be sending out the ICP
+        // if (diff_time > 0.5){diff_time = 0.0;}
 
-        double diff_yaw = diff_time*_yaw_rate;
-        //Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
-        Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
-        double del_x = diff_time*_speed;
-        Eigen::Translation3f init_translation (del_x, 0.0, 0.0);
-        Eigen::Matrix4f init_guess_imu = (init_translation * init_rotation).matrix ();
-        Eigen::Matrix4f init_guess = init_guess_imu*prev_transformation;
+        // double diff_yaw = diff_time*_yaw_rate;
+        // //Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
+        // Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
+        // double del_x = diff_time*_speed;
+        // Eigen::Translation3f init_translation (del_x, 0.0, 0.0);
+        // Eigen::Matrix4f init_guess_imu = (init_translation * init_rotation).matrix ();
+        // Eigen::Matrix4f init_guess = init_guess_imu*prev_transformation;
         /////////////////////////////////////////////////////////////////////////////////      
 
         // Use this instead if you want to use IMu corrections
-        // Eigen::Matrix4f init_guess = prev_transformation;
+        Eigen::Matrix4f init_guess = prev_transformation;
 
         // Matching CLouds
         start = chrono::system_clock::now(); 
@@ -570,9 +586,11 @@ void ICP3D::tf_broadcast(Eigen::Matrix4f trans){
 
     // Read message content and assign it to
     // corresponding tf variables
-    t.header.stamp = now;
+    // t.header.stamp = now()
+    //t.header.stamp = this->get_clock()->now();
+    t.header.stamp = rclcpp::Clock().now();
     t.header.frame_id = "the_map";
-    t.child_frame_id = "ego_vehicle/lidar";
+    t.child_frame_id = "velodyne"; //"ego_vehicle/lidar";
     t.transform.translation.x = v(0);
     t.transform.translation.y = v(1);
     t.transform.translation.z = v(2);
