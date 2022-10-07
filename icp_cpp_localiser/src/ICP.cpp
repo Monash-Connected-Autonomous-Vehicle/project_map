@@ -1,3 +1,4 @@
+#define BOOST_BIND_NO_PLACEHOLDERS
 #include "../include/icp_cpp_localiser/ICP.h"
 #include <iostream>
 #include <chrono>
@@ -6,7 +7,6 @@
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic pop
 #include "std_msgs/msg/string.hpp"
-
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 
 #include <tf2/LinearMath/Quaternion.h>
