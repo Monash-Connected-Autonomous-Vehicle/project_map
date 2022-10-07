@@ -109,6 +109,7 @@ class ICP3D : public rclcpp::Node
         double _init_y;
         double _init_z;
 
+        bool _use_sim_time;
 
         // Had to change max iter, meak k and eps angle from int to double
 };

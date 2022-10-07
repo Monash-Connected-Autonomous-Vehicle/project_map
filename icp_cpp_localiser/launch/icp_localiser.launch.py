@@ -19,7 +19,7 @@ def generate_launch_description():
    return LaunchDescription([
       DeclareLaunchArgument(
          'use_sim_time',
-         default_value='false',
+         default_value='true',
          description='Use simulation (Carla) clock if true'),
       Node(
          package='icp_cpp_localiser',
