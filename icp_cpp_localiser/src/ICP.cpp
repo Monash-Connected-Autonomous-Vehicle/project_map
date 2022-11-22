@@ -473,6 +473,11 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, *current_cloud_ptr);
         filterCloud(current_cloud_ptr, filtered_cloud_ptr);
+	if (!filtered_cloud_ptr->is_dense) {
+		std::vector<int> indices;
+		pcl::removeNaNFromPointCloud(*filtered_cloud_ptr, *filtered_cloud_ptr, indices);
+		filtered_cloud_ptr->is_dense = false;
+	}
 
         //Initialising the previous transformation
         // This would be good for initial pose estimation (if car doesn't start at 0 position)
@@ -495,6 +500,11 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, *current_cloud_ptr);
         filterCloud(current_cloud_ptr, filtered_cloud_ptr);
+	if (!filtered_cloud_ptr->is_dense) {
+		std::vector<int> indices;
+		pcl::removeNaNFromPointCloud(*filtered_cloud_ptr, *filtered_cloud_ptr, indices);
+		filtered_cloud_ptr->is_dense = false;
+	}
         //RCLCPP_INFO(this->get_logger(),"No. Point Incoming: " + to_string(current_cloud_ptr->size())); 
         //RCLCPP_INFO(this->get_logger(),"No. Points Filter: " + to_string(filtered_cloud_ptr->size())); 
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
@@ -511,22 +521,22 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
 
         ///////////////////////// USING IMU ////////////////////////////////////
-        // double diff_time = msg->header.stamp.sec - _prev_time_stamp; //calculating time btw the matching pointclouds
+        double diff_time = msg->header.stamp.sec - _prev_time_stamp; //calculating time btw the matching pointclouds
         
         // // Weird diff_time = 1 -> seems to be sending out the ICP
-        // if (diff_time > 0.5){diff_time = 0.0;}
+        if (diff_time > 0.5){diff_time = 0.0;}
 
-        // double diff_yaw = diff_time*_yaw_rate;
+        double diff_yaw = diff_time*_yaw_rate;
         // //Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
-        // Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
-        // double del_x = diff_time*_speed;
-        // Eigen::Translation3f init_translation (del_x, 0.0, 0.0);
-        // Eigen::Matrix4f init_guess_imu = (init_translation * init_rotation).matrix ();
-        // Eigen::Matrix4f init_guess = init_guess_imu*prev_transformation;
+        Eigen::AngleAxisf init_rotation (diff_yaw, Eigen::Vector3f::UnitZ ());
+        double del_x = diff_time*_speed;
+        Eigen::Translation3f init_translation (del_x, 0.0, 0.0);
+        Eigen::Matrix4f init_guess_imu = (init_translation * init_rotation).matrix ();
+        Eigen::Matrix4f init_guess = init_guess_imu*prev_transformation;
         /////////////////////////////////////////////////////////////////////////////////      
 
         // Use this instead if you want to use IMu corrections
-        Eigen::Matrix4f init_guess = prev_transformation;
+        // Eigen::Matrix4f init_guess = prev_transformation;
 
         // Matching CLouds
         start = chrono::system_clock::now(); 
