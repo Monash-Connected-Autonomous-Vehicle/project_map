@@ -1,7 +1,7 @@
 icp_localiser_node:
   ros__parameters:
     point_cloud_topic: "/velodyne_points" # "/carla/ego_vehicle/lidar"  point cloud ros topic to subscribe to
-    imu_topic: "/carla/ego_vehicle/imu" #imu ros topic to subscribe to
+    imu_topic: "/sd_current_IMU" #imu ros topic to subscribe to
     pose_topic: "/my_icp_pose" #pose ros topic to which to publish
 
     # Downsample Filter
@@ -36,8 +36,8 @@ icp_localiser_node:
     # max_correspondence_distance: 30.5 #correspondences with higher distances will be ignored
     # max_iters: 50.0 #max number of registration iterations
 
-    fit_score: 170
-    recov_fit_score: 170
+    fit_score: 17000 #170
+    recov_fit_score: 17000 #170
 
     resolution_points_init: 0.1
     resolution_points_recov: 4.0
@@ -47,6 +47,6 @@ icp_localiser_node:
     init_y: -3.4
     init_z: 2.4
 
-    map_path: "/home/mcav/liam_ws/localisation/localisation_ws/src/project_map/icp_cpp_localiser/autoware-221006.pcd"
+    map_path: "/home/mcav/mcav_ws/src/mcav_autonomy/project_map/icp_cpp_localiser/n1level4-autoware-221006.pcd"
     #map_path: "/home/mcav/liam_ws/localisation/pointclouds/10kmhsquare_Voxel.pcd"
     use_sim_time: false
