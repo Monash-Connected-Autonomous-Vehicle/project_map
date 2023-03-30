@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(icp_cpp_localiser)
+project(icp_localiser)
 
 # Default to C++14
 # HAD TO CHANGE TO C++ 17
@@ -11,7 +11,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# add_executable(icp_localiser src/icp_cpp_node.cpp)
+# add_executable(icp_localiser src/icp_node.cpp)
 # target_link_libraries(icp_localiser ${PCL_Libraries})
 add_executable(icp_localiser_node src/ICP_node.cpp src/ICP.cpp) # Add executable needs a main function - just add these two files into executble
 

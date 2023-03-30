@@ -47,6 +47,6 @@ icp_localiser_node:
     init_y: -3.4
     init_z: 2.4
 
-    map_path: "/home/mcav/mcav_ws/src/mcav_autonomy/project_map/icp_cpp_localiser/n1level4-autoware-221006.pcd"
+    map_path: "/home/mcav/mcav_ws/src/mcav_autonomy/project_map/icp_localiser/n1level4-autoware-221006.pcd"
     #map_path: "/home/mcav/liam_ws/localisation/pointclouds/10kmhsquare_Voxel.pcd"
     use_sim_time: false

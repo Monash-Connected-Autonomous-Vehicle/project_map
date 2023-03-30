@@ -12,7 +12,7 @@ def generate_launch_description():
    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
 
    config = os.path.join(
-      get_package_share_directory('icp_cpp_localiser'),
+      get_package_share_directory('icp_localiser'),
       'config',
       'icp_localiser.yaml'
       )
@@ -23,7 +23,7 @@ def generate_launch_description():
          default_value='true',
          description='Use simulation (Carla) clock if true'),
       Node(
-         package='icp_cpp_localiser',
+         package='icp_localiser',
          executable='icp_localiser_node',
          name='icp_localiser_node',
          parameters=[config, {'use_sim_time': use_sim_time}]
