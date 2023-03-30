@@ -473,11 +473,11 @@ void ICP3D::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, *current_cloud_ptr);
         filterCloud(current_cloud_ptr, filtered_cloud_ptr);
-	if (!filtered_cloud_ptr->is_dense) {
-		std::vector<int> indices;
-		pcl::removeNaNFromPointCloud(*filtered_cloud_ptr, *filtered_cloud_ptr, indices);
-		filtered_cloud_ptr->is_dense = false;
-	}
+        if (!filtered_cloud_ptr->is_dense) {
+            std::vector<int> indices;
+            pcl::removeNaNFromPointCloud(*filtered_cloud_ptr, *filtered_cloud_ptr, indices);
+            filtered_cloud_ptr->is_dense = false;
+        }
 
         //Initialising the previous transformation
         // This would be good for initial pose estimation (if car doesn't start at 0 position)
