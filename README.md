@@ -107,3 +107,31 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+# Creating a map
+
+## Recording Data
+Connect the LiDAR sensor to the main computer. 
+
+Set up the CAN bus connection: 
+`SD-VehicleInterface/can_setup.sh`
+
+```
+docker/run.sh
+src
+ros2 launch data_recording record.launch.xml rec_lidar:=true lidar_driver:=true launch_vi:=true
+```
+When done, press Ctrl-c. This should create a rosbag folder with a name something like `rosbag2_2023_03_08-06_07_25_0`.
+
+## Mapping
+https://autowarefoundation.github.io/autoware-documentation/main/how-to-guides/creating-maps-for-autoware/
+
+Get the autoware prebuilt docker: https://autowarefoundation.github.io/autoware-documentation/main/installation/autoware/docker-installation-prebuilt/
+
+```
+cd /autoware
+
+source install/setup.bash
+
+ros2 launch tier4_localization_launch localization.launch.xml
+```
+But that needs more parameters
